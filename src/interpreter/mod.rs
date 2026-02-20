@@ -3,8 +3,8 @@ use std::sync::Arc;
 use formality_core::{Map, Upcast};
 
 use crate::grammar::{
-    ClassDecl, ClassDeclBoundData, ClassPredicate, FieldId, MethodDeclBoundData,
-    MethodId, Parameter, ParameterPredicate, Program, TypeName, ValueId, Var,
+    ClassDecl, ClassDeclBoundData, ClassPredicate, FieldId, MethodDeclBoundData, MethodId,
+    Parameter, ParameterPredicate, Program, TypeName, ValueId, Var,
 };
 
 use crate::type_system::env::Env;
@@ -203,6 +203,7 @@ impl<'a> Interpreter<'a> {
                 let name = match &obj.class {
                     TypeName::Id(id) => format!("{id:?}"),
                     TypeName::Int => "Int".to_string(),
+                    TypeName::Pointer => "Pointer".to_string(),
                     TypeName::Tuple(n) => format!("Tuple({n})"),
                 };
                 write!(buf, "{name}").unwrap();

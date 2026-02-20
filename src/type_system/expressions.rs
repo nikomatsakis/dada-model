@@ -12,7 +12,7 @@ use crate::{
         env::Env,
         in_flight::InFlight,
         liveness::LivePlaces,
-        predicates::{prove_is_shareable, prove_is_copy, prove_predicates},
+        predicates::{prove_is_copy, prove_is_shareable, prove_predicates},
         subtypes::sub,
     },
 };
@@ -125,11 +125,17 @@ judgment_fn! {
         )
 
         (
+            // Find the class definition
             (let class_decl = env.program().class_named(&class_name)?)
-            (let ClassDeclBoundData { predicates, fields, methods: _ } = class_decl.binder.instantiate_with(&parameters)?)
-            (if fields.len() == exprs.len())
-            (let this_ty = NamedTy::new(&class_name, &parameters))
 
+            // Extract the class predicates along with the fields and their types.
+            (let ClassDeclBoundData { predicates, fields, methods: _ } = class_decl.binder.instantiate_with(&parameters)?)
+
+            // Check we have the correct number of arguments.
+            (if fields.len() == exprs.len())
+
+            // Prove that the class requirements hold.
+            (let this_ty = NamedTy::new(&class_name, &parameters))
             (prove_predicates(&env, predicates) => ())
 
             (let (env, temp_var) = env.push_fresh_variable(&this_ty))
@@ -184,6 +190,43 @@ judgment_fn! {
             (type_expr_as(env, &live_after, &*if_false, Ty::unit()) => env)
             ----------------------------------- ("if")
             (type_expr(env, live_after, Expr::If(cond, if_true, if_false)) => (env, Ty::unit()))
+        )
+
+        (
+            (type_expr_as(&env, live_after, &*size, Ty::int()) => env)
+            ----------------------------------- ("PointerAlloc")
+            (type_expr(env, live_after, Expr::PointerAlloc(size)) => (env, Ty::pointer()))
+        )
+
+        (
+            (type_expr_as(&env, live_after, &*pointer, Ty::pointer()) => env)
+            ----------------------------------- ("PointerDrop")
+            (type_expr(env, live_after, Expr::PointerDrop(_ty, pointer)) => (env, Ty::pointer()))
+        )
+
+        (
+            (type_expr_as(&env, live_after, &*value, ty) => env)
+            ----------------------------------- ("PointerInitialize")
+            (type_expr(env, live_after, Expr::PointerInitialize(ty, value)) => (env, Ty::pointer()))
+        )
+
+        (
+            (type_expr_as(&env, live_after, &*pointer, Ty::pointer()) => env)
+            ----------------------------------- ("PointerFree")
+            (type_expr(env, live_after, Expr::PointerFree(pointer)) => (env, Ty::pointer()))
+        )
+
+        (
+            (type_expr_as(env, live_after.before(&pointer), &*offset, Ty::int()) => env)
+            (type_expr_as(env, &live_after, &*pointer, Ty::pointer()) => env)
+            ----------------------------------- ("PointerFree")
+            (type_expr(env, live_after, Expr::PointerOffset(offset, pointer)) => (env, Ty::pointer()))
+        )
+
+        (
+            (type_expr_as(env, &live_after, &*pointer, Ty::pointer()) => env)
+            ----------------------------------- ("PointerRead")
+            (type_expr(env, live_after, Expr::PointerRead(ty, pointer)) => (env, ty))
         )
     }
 }
